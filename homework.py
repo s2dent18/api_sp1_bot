@@ -13,37 +13,59 @@ load_dotenv()
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s, %(levelname)s, %(message)s',
+    encoding='utf-8',
     handlers=[
         RotatingFileHandler('program.log', maxBytes=50000000, backupCount=5),
     ]
 )
 
 
-PRAKTIKUM_TOKEN = os.getenv("PRAKTIKUM_TOKEN")
+PRAKTIKUM_TOKEN = os.getenv('PRAKTIKUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 API_URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
 
 
 def parse_homework_status(homework):
-    homework_name = homework.get('homework_name')
-    homework_statuses = homework.get('status')
-    if homework_statuses == 'rejected':
-        verdict = 'К сожалению в работе нашлись ошибки.'
-    if homework_statuses == 'reviewing':
-        verdict = 'Работа взята на проверку'
-    if homework_statuses == 'approved':
-        verdict = (
+    statuses_dict = {
+        'rejected': 'К сожалению в работе нашлись ошибки.',
+        'reviewing': 'Работа взята на проверку',
+        'approved': (
             'Ревьюеру всё понравилось, можно приступать к следующему уроку.'
-        )
+        ),
+    }
+    homework_name = homework.get('homework_name')
+    if homework_name is None:
+        logging.error('Ошибка запроса названия работы')
+    homework_statuses = homework.get('status')
+    if homework_statuses not in statuses_dict:
+        logging.error('Ошибка запроса статуса работы')
+    verdict = statuses_dict[homework_statuses]
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
 def get_homework_statuses(current_timestamp):
+    if int(current_timestamp) != int(time.time()):
+        logging.warning(
+            'current_timestamp не соответствовал текущему времени '
+            'и был перезаписан'
+        )
+        current_timestamp = int(time.time())
     headers = {'Authorization': f'OAuth {PRAKTIKUM_TOKEN}'}
     params = {'from_date': current_timestamp}
-    homework_statuses = requests.get(API_URL, headers=headers, params=params)
-    return homework_statuses.json()
+    try:
+        homework_statuses = requests.get(
+            API_URL,
+            headers=headers,
+            params=params
+        )
+    except requests.exceptions.RequestException as e:
+        logging.error(f'Ошибка запроса: {e}')
+    try:
+        return homework_statuses.json()
+    except ValueError as e:
+        logging.error(f'Ошибка парсинга: {e}')
+        return {}
 
 
 def send_message(message, bot_client):
