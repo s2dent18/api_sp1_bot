@@ -80,7 +80,7 @@ def main():
             current_timestamp = new_homework.get(
                 'current_date'
             )
-            time.sleep(60)
+            time.sleep(300)
 
         except Exception as e:
             message = f'Бот столкнулся с ошибкой: {e}'
