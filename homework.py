@@ -35,22 +35,16 @@ def parse_homework_status(homework):
         ),
     }
     homework_name = homework.get('homework_name')
-    if homework_name is None:
-        logging.error('Ошибка запроса названия работы')
     homework_statuses = homework.get('status')
-    if homework_statuses not in statuses_dict:
-        logging.error('Ошибка запроса статуса работы')
+    if homework_name is None or homework_statuses not in statuses_dict:
+        logging.error('Неверный статус или имя работы не найдено')
+        return 'Неверный статус или имя работы не найдено'
     verdict = statuses_dict[homework_statuses]
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
 def get_homework_statuses(current_timestamp):
-    if int(current_timestamp) != int(time.time()):
-        logging.warning(
-            'current_timestamp не соответствовал текущему времени '
-            'и был перезаписан'
-        )
-        current_timestamp = int(time.time())
+    current_timestamp = current_timestamp or int(time.time())
     headers = {'Authorization': f'OAuth {PRAKTIKUM_TOKEN}'}
     params = {'from_date': current_timestamp}
     try:
@@ -59,12 +53,9 @@ def get_homework_statuses(current_timestamp):
             headers=headers,
             params=params
         )
+        return homework_statuses.json()
     except requests.exceptions.RequestException as e:
         logging.error(f'Ошибка запроса: {e}')
-    try:
-        return homework_statuses.json()
-    except ValueError as e:
-        logging.error(f'Ошибка парсинга: {e}')
         return {}
 
 
@@ -87,10 +78,9 @@ def main():
                 )
                 logging.info('Бот отправил сообщение')
             current_timestamp = new_homework.get(
-                'current_date',
-                current_timestamp
+                'current_date'
             )
-            time.sleep(300)
+            time.sleep(60)
 
         except Exception as e:
             message = f'Бот столкнулся с ошибкой: {e}'
